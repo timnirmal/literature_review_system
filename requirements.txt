@@ -1,23 +1,23 @@
 # Core dependencies
-python-dotenv==1.0.0
-openai==1.7.0
-anthropic==0.8.0
-google-generativeai==0.3.1
-tenacity==8.2.3
+python-dotenv
+openai
+anthropic
+google-genai
+tenacity
 
 # Database dependencies
-supabase==1.2.0
-neo4j==5.13.0
+supabase
+neo4j
 
-# PDF processing
-PyPDF2==3.0.1
+# # PDF processing
+# PyPDF2
 
 # Web API
-fastapi==0.104.1
-uvicorn==0.23.2
-python-multipart==0.0.6
-pydantic==2.4.2
+fastapi
+uvicorn
+python-multipart
+pydantic
 
 # Utilities
-numpy==1.26.0
-pandas==2.1.0
+numpy
+pandas

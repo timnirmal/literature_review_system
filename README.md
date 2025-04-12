@@ -1,3 +1,5 @@
+https://claude.ai/share/a5ed5324-7aa5-473c-a77b-35f796c32e03
+
 # Literature Review System - Modular Implementation
 
 I've reorganized the Literature Review System into a modular structure that makes it more maintainable, flexible, and easier to extend. This implementation separates concerns, makes each component model-agnostic, and provides both a command-line interface and a REST API.

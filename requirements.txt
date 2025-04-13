@@ -1,9 +1,9 @@
 # Core dependencies
 python-dotenv
 openai
-# anthropic
+anthropic
 google-genai
-# tenacity
+tenacity
 
 # Database dependencies
 supabase

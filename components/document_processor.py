@@ -12,6 +12,7 @@ import logging
 import tempfile
 from typing import Dict, Any, List, Optional, Tuple
 from pathlib import Path
+import io
 
 from gemini_parser import DocumentProcessor as GeminiParser
 
@@ -78,11 +79,17 @@ class DocumentProcessor:
             Extracted text content
         """
         import PyPDF2
+
+        basename = os.path.basename(pdf_path)
+        if basename.startswith("._"):
+            logger.warning(f"Skipping metadata file: {pdf_path}")
+            return ""
         
         text = ""
         try:
             with open(pdf_path, 'rb') as file:
-                pdf_reader = PyPDF2.PdfReader(file)
+                input_buffer = io.BytesIO(file.read())
+                pdf_reader = PyPDF2.PdfReader(input_buffer)
                 for page_num, page in enumerate(pdf_reader.pages):
                     page_text = page.extract_text() or ""
                     text += page_text + "\n"
@@ -159,6 +166,8 @@ class DocumentProcessor:
                 # Create a temporary output directory for saving the processed file
                 output_dir = Path(tempfile.mkdtemp(prefix="gemini_output_"))
                 file_path = Path(pdf_path)
+
+                logger.info(f"Processing {file_path} with Gemini Parser")
                 
                 # Process with Gemini and save to output directory
                 self.parser.process_folder(
@@ -166,6 +175,8 @@ class DocumentProcessor:
                     output_dir=output_dir,
                     out_ext="md"
                 )
+
+                logger.info(f"Gemini Parser output saved to {output_dir}")
                 
                 # Look for the corresponding output file
                 expected_output = output_dir / f"{file_path.stem}.md"
@@ -208,6 +219,8 @@ class DocumentProcessor:
         
         # Extract metadata
         metadata = self.extract_metadata_with_llm(full_text)
+
+        logger.info(f"Extracted metadata: {json.dumps(metadata)[:100]}... xxx")
         
         # Generate a unique ID
         paper_id = str(uuid.uuid4())
@@ -288,6 +301,8 @@ class DocumentProcessor:
             
             # Extract metadata
             metadata = self.extract_metadata_with_llm(full_text)
+
+            logger.info(f"Extracted metadata from URL: {json.dumps(metadata)[:100]}... yyy")
             
             # Generate a unique ID
             paper_id = str(uuid.uuid4())
@@ -352,6 +367,10 @@ class DocumentProcessor:
         for filename in pdf_files:
             try:
                 file_path = os.path.join(pdf_folder_path, filename)
+                basename = os.path.basename(file_path)
+                if basename.startswith("._"):
+                    logger.warning(f"Skipping metadata file: {file_path}")
+                    continue
                 paper_id = self.process_and_store_paper(file_path)
                 paper_ids.append(paper_id)
                 logger.info(f"Successfully processed {filename}")

@@ -177,15 +177,13 @@ def read_root():
 @app.post("/papers/upload", response_model=PaperUploadResponse)
 async def upload_papers(
     background_tasks: BackgroundTasks,
-    files: List[UploadFile] = File(...),
-    model: str = Form(DEFAULT_MODEL)
+    files: List[UploadFile] = File(...)
 ):
     """
     Upload PDF papers for processing.
     
     Args:
         files: List of PDF files to upload
-        model: LLM model to use
         
     Returns:
         Task ID for tracking the processing job
@@ -218,7 +216,7 @@ async def upload_papers(
             process_papers_task,
             task_id=task_id,
             folder_path=str(batch_dir),
-            model=model
+            model=DEFAULT_MODEL
         )
         
         return PaperUploadResponse(
@@ -228,6 +226,55 @@ async def upload_papers(
     except Exception as e:
         logger.error(f"Error uploading papers: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/papers/process_url", response_model=PaperUploadResponse)
+async def process_url(
+        background_tasks: BackgroundTasks,
+        url: str = Form(...)
+):
+    """
+    Process a paper from a URL.
+
+    Args:
+        url: URL to a PDF file
+
+    Returns:
+        Task ID for tracking the processing job
+    """
+    if not url:
+        raise HTTPException(status_code=400, detail="No URL provided")
+
+    # Generate a task ID
+    task_id = uuid.uuid4().hex
+
+    # Store task in background tasks
+    background_tasks[task_id] = {"status": "processing"}
+
+    # Define the background task function
+    async def process_url_task():
+        try:
+            system = LiteratureReviewSystem()
+            paper_id = system.process_paper_from_url(url)
+            background_tasks[task_id] = {
+                "status": "completed",
+                "result": {"paper_id": paper_id}
+            }
+        except Exception as e:
+            logger.error(f"Error processing URL: {str(e)}", exc_info=True)
+            background_tasks[task_id] = {
+                "status": "failed",
+                "error": str(e)
+            }
+
+    # Start background processing
+    background_tasks.add_task(process_url_task)
+
+    return PaperUploadResponse(
+        task_id=task_id,
+        message=f"Processing paper from URL in the background"
+    )
+
 
 @app.get("/tasks/{task_id}", response_model=TaskStatusResponse)
 def get_task_status(task_id: str):

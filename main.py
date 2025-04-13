@@ -12,7 +12,7 @@ import logging
 from typing import List, Dict, Any
 
 from config import (
-    OPENAI_API_KEY, DEFAULT_MODEL,
+    DEFAULT_MODEL, ANTHROPIC_API_KEY, GOOGLE_API_KEY,
     SUPABASE_URL, SUPABASE_KEY,
     NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD
 )
@@ -45,9 +45,7 @@ class LiteratureReviewSystem:
         neo4j_uri: str = NEO4J_URI,
         neo4j_user: str = NEO4J_USER,
         neo4j_password: str = NEO4J_PASSWORD,
-        model: str = DEFAULT_MODEL,
-        anthropic_api_key: str = None,
-        google_api_key: str = None
+        model: str = DEFAULT_MODEL
     ):
         """
         Initialize the Literature Review System.
@@ -59,15 +57,15 @@ class LiteratureReviewSystem:
             neo4j_user: Neo4j username
             neo4j_password: Neo4j password
             model: Default LLM model to use
-            anthropic_api_key: Anthropic API key (optional)
-            google_api_key: Google API key (optional)
         """
         # Initialize optional API clients
-        if anthropic_api_key:
-            initialize_anthropic(anthropic_api_key)
+        if ANTHROPIC_API_KEY:
+            initialize_anthropic(ANTHROPIC_API_KEY)
+            logger.info("Initialized Anthropic client")
         
-        if google_api_key:
-            initialize_genai(google_api_key)
+        if GOOGLE_API_KEY:
+            initialize_genai(GOOGLE_API_KEY)
+            logger.info("Initialized Google Generative AI client")
         
         # Initialize database managers
         self.supabase = SupabaseManager(url=supabase_url, key=supabase_key)
@@ -107,6 +105,19 @@ class LiteratureReviewSystem:
         logger.info(f"Processing papers from {pdf_folder_path}")
         return self.document_processor.batch_process_papers(pdf_folder_path)
     
+    def process_paper_from_url(self, url: str) -> str:
+        """
+        Process a paper from a URL.
+
+        Args:
+            url: URL to the PDF file
+
+        Returns:
+            ID of the processed paper
+        """
+        logger.info(f"Processing paper from URL: {url}")
+        return self.document_processor.process_from_url(url)
+
     def extract_entities(self, paper_ids: List[str]) -> Dict[str, Dict[str, Any]]:
         """
         Extract entities from papers.
@@ -237,22 +248,11 @@ def main():
         help="Comma-separated list of paper IDs (if papers already processed)"
     )
     parser.add_argument(
-        "--model", 
-        type=str, 
-        default=DEFAULT_MODEL,
-        help=f"LLM model to use (default: {DEFAULT_MODEL})"
+        "--url",
+        type=str,
+        help="URL to a PDF file to process"
     )
-    parser.add_argument(
-        "--anthropic_key", 
-        type=str, 
-        help="Anthropic API key (if using Claude models)"
-    )
-    parser.add_argument(
-        "--google_key", 
-        type=str, 
-        help="Google API key (if using Gemini models)"
-    )
-    
+
     args = parser.parse_args()
     
     # Validate arguments
@@ -261,22 +261,40 @@ def main():
         parser.print_help()
         return
     
-    if not args.pdf_folder and not args.paper_ids:
-        print("Error: Either PDF folder or paper IDs must be provided")
+    if not args.pdf_folder and not args.paper_ids and not args.url:
+        print("Error: Either PDF folder, URL, or paper IDs must be provided")
         parser.print_help()
         return
     
     try:
         # Initialize system
-        system = LiteratureReviewSystem(
-            model=args.model,
-            anthropic_api_key=args.anthropic_key,
-            google_api_key=args.google_key
-        )
+        system = LiteratureReviewSystem()
         system.initialize()
         
-        # Run pipeline
-        if args.pdf_folder:
+        # Process from URL if provided
+        if args.url:
+            paper_id = system.process_paper_from_url(args.url)
+            print(f"Processed paper from URL. Paper ID: {paper_id}")
+            paper_ids = [paper_id]
+
+            # Extract entities
+            system.extract_entities(paper_ids)
+
+            # Build knowledge graph
+            system.build_knowledge_graph(paper_ids)
+
+            # Generate review
+            review = system.generate_review(args.topic, paper_ids)
+
+            # Save to file
+            output_file = f"literature_review_{args.topic.replace(' ', '_').lower()}.md"
+            with open(output_file, "w") as file:
+                file.write(review)
+
+            print(f"Literature review saved to {output_file}")
+
+        # Process from folder if provided
+        elif args.pdf_folder:
             # Full pipeline with PDF processing
             review = system.run_full_pipeline(args.pdf_folder, args.topic)
         else:

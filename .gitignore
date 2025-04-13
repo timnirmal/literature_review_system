@@ -59,7 +59,6 @@ coverage.xml
 *.cover
 
 # Project specific
-papers/
 data/
 output/
 temp/

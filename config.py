@@ -11,6 +11,9 @@ load_dotenv()
 # API Keys
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 OPENAI_ORG_ID = os.environ.get("OPENAI_ORG_ID", "")  # Optional
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")  # Optional
+GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "")  # Optional
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")  # Optional
 
 # Supabase Configuration
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
@@ -29,3 +32,6 @@ DEFAULT_EMBEDDING_MODEL = os.environ.get("DEFAULT_EMBEDDING_MODEL", "text-embedd
 CHUNK_SIZE = int(os.environ.get("CHUNK_SIZE", "30000"))  # Maximum chunk size for LLM processing
 MAX_RETRIES = int(os.environ.get("MAX_RETRIES", "3"))  # Maximum retries for API calls
 RETRY_DELAY = int(os.environ.get("RETRY_DELAY", "1"))  # Seconds to wait between retries
+
+# PDF Processing
+USE_GEMINI_PARSER = os.environ.get("USE_GEMINI_PARSER", "False").lower() == "true"

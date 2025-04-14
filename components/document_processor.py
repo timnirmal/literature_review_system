@@ -224,6 +224,11 @@ class DocumentProcessor:
         
         # Generate a unique ID
         paper_id = str(uuid.uuid4())
+
+        # check it title is empty
+        if not metadata.get("title"):
+            logger.error(f"Title is empty for {pdf_path}")
+            raise ValueError(f"Title is empty for {pdf_path}")
         
         # Prepare paper data
         paper_data = {

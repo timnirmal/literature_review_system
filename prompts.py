@@ -8,12 +8,12 @@ to guide LLM responses for different tasks in the system.
 # Document Processing Prompts
 METADATA_EXTRACTION_PROMPT = """
 Extract the following metadata from this academic paper:
-- Title
-- Authors (as a list)
-- Publication Year
-- Journal/Conference
-- DOI (if present)
-- Abstract
+- Title `json"title"` `type:"string"`
+- Authors (as a list) `json"authors"` `type:"[]string"`
+- Publication Year `json"year"` `type:"int"`
+- Journal/Conference `json"venue"` `type:"string"`
+- DOI (if present) `json"doi"` `type:"string"`
+- Abstract `json"abstract"` `type:"string"`
 
 Format the response as a valid JSON object.
 

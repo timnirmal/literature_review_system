@@ -47,7 +47,7 @@ class ReviewGenerator:
         self.supabase = supabase_manager
         self.model = model
     
-    def cluster_papers_by_topic(self, paper_ids: List[str]) -> Dict[str, Dict[str, Any]]:
+    def cluster_papers_by_topic(self, paper_ids: List[str], support_doc: str) -> Dict[str, Dict[str, Any]]:
         """
         Cluster papers into topics using LLM.
         
@@ -75,6 +75,9 @@ class ReviewGenerator:
             f"Paper {i+1}:\nTitle: {p['title']}\nAbstract: {p['abstract']}\nID: {p['id']}"
             for i, p in enumerate(papers_data)
         ])
+
+        if support_doc:
+            papers_text += f"\n\nSupporting Document:\n{support_doc}"
         
         # Ask LLM to cluster
         prompt = TOPIC_CLUSTERING_PROMPT.format(papers_text=papers_text)
@@ -110,7 +113,7 @@ class ReviewGenerator:
             logger.error(f"Error clustering papers: {str(e)}")
             return {}
     
-    def create_narrative_structure(self, topic: str, paper_ids: List[str]) -> Dict[str, Any]:
+    def create_narrative_structure(self, topic: str, paper_ids: List[str], support_doc: str) -> Dict[str, Any]:
         """
         Create a narrative structure for the literature review.
         
@@ -139,6 +142,11 @@ class ReviewGenerator:
         if not papers_data:
             logger.warning("No papers found for creating narrative structure")
             return {}
+
+        # Ensure all papers have a year
+        for paper in papers_data:
+            if not paper.get("year"):
+                paper["year"] = 9999
         
         # Sort papers by year
         papers_data.sort(key=lambda p: p.get("year", 9999))
@@ -149,6 +157,9 @@ class ReviewGenerator:
             f"Year: {p.get('year', 'Unknown')}\nAbstract: {p['abstract']}\nID: {p['id']}"
             for i, p in enumerate(papers_data)
         ])
+
+        if support_doc:
+            papers_text += f"\n\nSupporting Document:\n{support_doc}"
         
         # Ask LLM to create structure
         prompt = NARRATIVE_STRUCTURE_PROMPT.format(
@@ -178,7 +189,7 @@ class ReviewGenerator:
             logger.error(f"Error creating narrative structure: {str(e)}")
             return {}
     
-    def identify_research_gaps(self, topic: str, paper_ids: List[str]) -> List[Dict[str, Any]]:
+    def identify_research_gaps(self, topic: str, paper_ids: List[str], support_doc: str) -> List[Dict[str, Any]]:
         """
         Identify research gaps in the literature.
         
@@ -193,7 +204,7 @@ class ReviewGenerator:
         
         # Check if we already have gaps
         existing_gaps = self.supabase.get_latest_research_gaps(topic, paper_ids)
-        if existing_gaps:
+        if existing_gaps and not support_doc:
             logger.info(f"Using existing research gaps for topic '{topic}'")
             return existing_gaps
         
@@ -222,6 +233,9 @@ class ReviewGenerator:
             f"Paper: {p['title']} ({p.get('year', 'Unknown')})\nAbstract: {p['abstract']}"
             for p in papers_data
         ])
+
+        if support_doc:
+            papers_text += f"\n\nSupporting Document:\n{support_doc}"
         
         # Ask LLM to identify gaps
         prompt = RESEARCH_GAPS_PROMPT.format(
@@ -254,7 +268,7 @@ class ReviewGenerator:
             logger.error(f"Error identifying research gaps: {str(e)}")
             return []
     
-    def identify_research_trends(self, paper_ids: List[str]) -> Dict[str, Any]:
+    def identify_research_trends(self, paper_ids: List[str], support_doc: str) -> Dict[str, Any]:
         """
         Identify research trends over time.
         
@@ -268,7 +282,7 @@ class ReviewGenerator:
         
         # Check if we already have trends
         existing_trends = self.supabase.get_latest_research_trends(paper_ids)
-        if existing_trends:
+        if existing_trends and not support_doc:
             logger.info("Using existing research trends")
             return existing_trends
         
@@ -299,6 +313,9 @@ class ReviewGenerator:
         for year, papers in papers_by_year.items():
             papers_text = "\n".join([f"- {p['title']}" for p in papers])
             years_text += f"\nYear {year} ({len(papers)} papers):\n{papers_text}\n"
+
+        if support_doc:
+            years_text += f"\nSupporting Document:\n{support_doc}"
         
         # Ask LLM to identify trends
         prompt = RESEARCH_TRENDS_PROMPT.format(years_text=years_text)
@@ -405,7 +422,7 @@ class ReviewGenerator:
             logger.error(f"Error generating section '{section_name}': {str(e)}")
             return f"## {section_name}\n\nError generating this section."
     
-    def generate_literature_review(self, topic: str, paper_ids: List[str]) -> str:
+    def generate_literature_review(self, topic: str, paper_ids: List[str], support_doc: str) -> str:
         """
         Generate a complete literature review.
         
@@ -420,8 +437,8 @@ class ReviewGenerator:
         
         # Step 1: Get or create narrative structure
         structure = self.supabase.get_latest_review_structure(topic, paper_ids)
-        if not structure:
-            structure = self.create_narrative_structure(topic, paper_ids)
+        if not structure and not support_doc:
+            structure = self.create_narrative_structure(topic, paper_ids, support_doc)
         
         if not structure:
             err_msg = f"Failed to create narrative structure for topic '{topic}'"
@@ -447,13 +464,13 @@ class ReviewGenerator:
         
         # Step 3: Get research gaps
         gaps = self.supabase.get_latest_research_gaps(topic, paper_ids)
-        if not gaps:
-            gaps = self.identify_research_gaps(topic, paper_ids)
+        if not gaps or support_doc:
+            gaps = self.identify_research_gaps(topic, paper_ids, support_doc)
         
         # Step 4: Get research trends
         trends = self.supabase.get_latest_research_trends(paper_ids)
-        if not trends:
-            trends = self.identify_research_trends(paper_ids)
+        if not trends or support_doc:
+            trends = self.identify_research_trends(paper_ids, support_doc)
         
         # Step 5: Generate each section of the review
         review_sections = {}

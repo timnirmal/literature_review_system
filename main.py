@@ -144,7 +144,7 @@ class LiteratureReviewSystem:
         logger.info(f"Building knowledge graph for {len(paper_ids)} papers")
         return self.graph_builder.build_knowledge_graph(paper_ids)
     
-    def generate_review(self, topic: str, paper_ids: List[str]) -> str:
+    def generate_review(self, topic: str, paper_ids: List[str], support_doc: str) -> str:
         """
         Generate a literature review.
         
@@ -158,23 +158,23 @@ class LiteratureReviewSystem:
         logger.info(f"Generating literature review on '{topic}' with {len(paper_ids)} papers")
         
         # Step 1: Cluster papers
-        clusters = self.review_generator.cluster_papers_by_topic(paper_ids)
+        clusters = self.review_generator.cluster_papers_by_topic(paper_ids, support_doc)
         logger.info(f"Clustered papers into {len(clusters)} topics")
         
         # Step 2: Create narrative structure
-        structure = self.review_generator.create_narrative_structure(topic, paper_ids)
+        structure = self.review_generator.create_narrative_structure(topic, paper_ids, support_doc)
         logger.info(f"Created narrative structure with {len(structure)} sections")
         
         # Step 3: Identify research gaps
-        gaps = self.review_generator.identify_research_gaps(topic, paper_ids)
+        gaps = self.review_generator.identify_research_gaps(topic, paper_ids, support_doc)
         logger.info(f"Identified {len(gaps)} research gaps")
         
         # Step 4: Identify research trends
-        trends = self.review_generator.identify_research_trends(paper_ids)
+        trends = self.review_generator.identify_research_trends(paper_ids, support_doc)
         logger.info("Identified research trends")
         
         # Step 5: Generate the review
-        review = self.review_generator.generate_literature_review(topic, paper_ids)
+        review = self.review_generator.generate_literature_review(topic, paper_ids, support_doc)
         logger.info(f"Generated literature review with {len(review)} characters")
         
         return review
@@ -222,6 +222,38 @@ class LiteratureReviewSystem:
         
         return review
     
+    def run_on_old_papers(self, topic: str, support_doc: str) -> str:
+        """
+        Run the review generation on previously processed papers.
+        
+        Args:
+            topic: Review topic
+            support_doc: Path to a support document for additional context
+            
+        Returns:
+            Generated literature review text
+        """
+        logger.info(f"Running review generation on old papers for topic '{topic}'")
+
+        if not support_doc:
+            err_msg = "Support document is required for old papers."
+            logger.error(err_msg)
+            return f"# Error\n\n{err_msg}"
+        
+        # Get paper IDs from Supabase
+        paper_ids = self.supabase.get_all_papers_ids()
+        
+        if not paper_ids:
+            err_msg = "No previously processed papers found."
+            logger.error(err_msg)
+            return f"# Error\n\n{err_msg}"
+        
+        # Generate review
+        review = self.generate_review(topic, paper_ids, support_doc)
+        logger.info("Generated literature review from old papers")
+        
+        return review
+    
     def close(self):
         """Close database connections."""
         logger.info("Closing database connections")
@@ -252,6 +284,11 @@ def main():
         type=str,
         help="URL to a PDF file to process"
     )
+    parser.add_argument(
+        "--support_doc",
+        type=str,
+        help="Path to a support document for additional context"
+    )
 
     args = parser.parse_args()
     
@@ -261,7 +298,7 @@ def main():
         parser.print_help()
         return
     
-    if not args.pdf_folder and not args.paper_ids and not args.url:
+    if not args.pdf_folder and not args.paper_ids and not args.url and not args.support_doc:
         print("Error: Either PDF folder, URL, or paper IDs must be provided")
         parser.print_help()
         return
@@ -297,6 +334,30 @@ def main():
         elif args.pdf_folder:
             # Full pipeline with PDF processing
             review = system.run_full_pipeline(args.pdf_folder, args.topic)
+        elif args.support_doc:
+            if not os.path.exists(args.support_doc):
+                err_msg = f"Support document '{args.support_doc}' does not exist."
+                logger.error(err_msg)
+                return f"# Error\n\n{err_msg}"
+
+            # check if support_doc is md file 
+            if not args.support_doc.endswith(".md"):
+                print("Error: Support document must be a markdown file (.md)")
+                return
+            
+            # read support document
+            with open(args.support_doc, "r") as file:
+                support_doc_content = file.read()
+
+            # Run on old papers with support document
+            review = system.run_on_old_papers(args.topic, support_doc_content)
+
+            # Save to file
+            output_file = f"literature_review_{args.topic.replace(' ', '_').lower()}.md"
+            with open(output_file, "w") as file:
+                file.write(review)
+
+            print(f"Literature review saved to {output_file}")
         else:
             # Use existing paper IDs
             paper_ids = [id.strip() for id in args.paper_ids.split(",")]

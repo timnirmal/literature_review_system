@@ -71,6 +71,12 @@ class SupabaseManager:
         if "processed" not in paper_data:
             paper_data["processed"] = False
         
+        # check if paper already exists
+        existing_paper = self.client.table("papers").select("*").eq("title", paper_data["title"]).execute()
+        if existing_paper.data:
+            logger.warning(f"Paper '{paper_data['title']}' already exists in the database")
+            return existing_paper.data[0]["id"]
+
         result = self.client.table("papers").insert(paper_data).execute()
         
         if not result.data:
@@ -414,3 +420,15 @@ class SupabaseManager:
                 matching_papers.append(paper)
         
         return matching_papers
+    
+    def get_all_papers_ids(self) -> List[str]:
+        """
+        Get all paper IDs in the database.
+        
+        Returns:
+            List of paper IDs
+        """
+        result = self.client.table("papers").select("id").execute()
+        if not result.data:
+            return []
+        return [paper["id"] for paper in result.data]
